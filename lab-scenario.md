@@ -7,9 +7,12 @@ Scenariusz tego laboratorium zakłada przyswojenie najważniejszych funkcjonalno
 Celem jest przyswojenie wiedzy i zwiększenie umiejętności korzystania z GitHub, w szczególności:
 
 - pracy z forkami i branchami,
-- tworzenia i przeglądania Pull Requestów,
-- promowania zmian pomiędzy środowiskami,
-- tworzenia tagów i publikowania wydań GitHub Release.
+- tworzenia Pull Requestów,
+- wykonywania code review,
+- promowania zmian pomiędzy branchami `dev`, `uat` i `main`,
+- tworzenia tagów wersji,
+- publikowania GitHub Releases,
+- aktualizowania ruchomych tagów środowiskowych.
 
 ## Założenia
 
@@ -17,18 +20,18 @@ Repozytorium jest publiczne i należy do **Użytkownika A**.
 
 **Użytkownik B** wykonuje fork repozytorium i przygotowuje zmiany we własnej kopii.
 
-Repozytorium główne posiada trzy branche:
+Główne repozytorium posiada trzy branche:
 
 | Branch | Przeznaczenie |
 |---|---|
-| `main` | wersja produkcyjna i stabilna |
-| `uat` | wersja przeznaczona do testów akceptacyjnych |
-| `dev` | branch integracyjny dla nowych zmian |
+| `dev` | rozwój i integracja nowych zmian |
+| `uat` | testy akceptacyjne |
+| `main` | stabilna wersja produkcyjna |
 
-Przepływ zmian powinien wyglądać następująco:
+Przepływ zmian:
 
 ```text
-fork użytkownika B
+fork Użytkownika B
         ↓
 feature branch
         ↓ Pull Request
@@ -38,97 +41,207 @@ uat
         ↓ Pull Request
 main
         ↓
-tag i Release
+tag wersji i GitHub Release
 ````
 
-W repozytorium głównym warto skonfigurować ochronę branchy `main`, `uat` oraz `dev`:
+## Model tagów
 
-* wymagaj Pull Requesta przed merge,
-* wymagaj co najmniej jednego zatwierdzenia,
-* wymagaj zamknięcia wszystkich dyskusji,
-* zablokuj bezpośrednie commity do chronionych branchy.
+W laboratorium używane są dwa rodzaje tagów.
+
+### Niezmienne tagi wersji
+
+Tagi wersji wskazują dokładny commit konkretnego wydania:
+
+```text
+v1.0.0
+v1.0.1
+v1.1.0
+```
+
+Po opublikowaniu wersji nie należy przesuwać takiego taga na inny commit.
+
+Przykład:
+
+```text
+v1.0.0 → commit pierwszego stabilnego wydania
+v1.0.1 → commit zawierający późniejszą poprawkę
+```
+
+### Ruchome tagi środowiskowe
+
+Tagi `latest-*` wskazują aktualną wersję znajdującą się na określonym środowisku:
+
+| Tag           | Znaczenie                                     |
+| ------------- | --------------------------------------------- |
+| `latest-dev`  | najnowszy commit przekazany do środowiska DEV |
+| `latest-uat`  | najnowszy commit przekazany do środowiska UAT |
+| `latest-prod` | commit aktualnej wersji produkcyjnej          |
+
+Tagi te są celowo przesuwane po każdej aktualizacji danego środowiska.
+
+```text
+latest-dev  → aktualny commit brancha dev
+latest-uat  → aktualny commit brancha uat
+latest-prod → commit aktualnego wydania produkcyjnego
+```
+
+Tag `latest-prod` nie jest tym samym co oznaczenie **Latest release** widoczne w GitHub Releases. Jest to zwykły, samodzielnie utworzony tag Git.
+
+## Konfiguracja repozytorium
+
+### Ochrona branchy
+
+Dla branchy `dev`, `uat` i `main` należy skonfigurować ochronę:
+
+* Require a pull request before merging,
+* Require approvals,
+* Required approvals: `1`,
+* Require conversation resolution before merging,
+* blokada bezpośrednich zmian na chronionych branchach.
+
+### Ochrona tagów wersji
+
+Opcjonalnie należy utworzyć tag ruleset dla wzorca:
+
+```text
+v*
+```
+
+Ruleset powinien ograniczać:
+
+* aktualizowanie istniejących tagów wersji,
+* usuwanie tagów wersji.
+
+Tagi:
+
+```text
+latest-dev
+latest-uat
+latest-prod
+```
+
+muszą pozostać możliwe do aktualizowania przez właściciela repozytorium albo osobę odpowiedzialną za wydania.
+
+## Konfiguracja początkowych tagów `latest-*`
+
+GitHub Web UI nie oferuje wygodnej operacji przesunięcia istniejącego taga. Dlatego do zarządzania ruchomymi tagami używany jest Git.
+
+Użytkownik A klonuje główne repozytorium:
+
+```bash
+git clone https://github.com/USER_A/REPOSITORY.git
+cd REPOSITORY
+git fetch origin --prune --tags
+```
+
+Następnie tworzy początkowe tagi:
+
+```bash
+git tag -f latest-dev origin/dev
+git push origin refs/tags/latest-dev --force
+
+git tag -f latest-uat origin/uat
+git push origin refs/tags/latest-uat --force
+
+git tag -f latest-prod origin/main
+git push origin refs/tags/latest-prod --force
+```
+
+Początkowy stan:
+
+```text
+latest-dev  → HEAD brancha dev
+latest-uat  → HEAD brancha uat
+latest-prod → HEAD brancha main
+```
 
 ---
 
-## Scenariusz 1 – Pull Request z forka do brancha `dev`
+## Scenariusz 1 – Pull Request z forka i promocja zmian
 
 ### Cel ćwiczenia
 
-Przećwiczenie pracy z publicznym repozytorium bez bezpośredniego zapisu do repozytorium głównego.
+Przećwiczenie pełnego przepływu:
 
-### Zadanie
+```text
+fork → feature branch → Pull Request → review → dev → uat → main
+```
 
-Użytkownik B ma dodać plik z opisem podstawowych zasad bezpieczeństwa systemu Linux.
+### Etap 1 – Utworzenie zadania
 
-### Przebieg
-
-1. Użytkownik A tworzy w głównym repozytorium Issue:
+1. Użytkownik A tworzy Issue:
 
    ```text
    Add Linux security recommendations
    ```
 
-2. W Issue definiuje wymagania:
+2. Acceptance criteria:
 
    * utworzyć plik `LINUX_SECURITY.md`,
-   * opisać aktualizacje systemu,
+   * opisać aktualizację systemu,
    * opisać konfigurację firewalla,
    * opisać podstawowe zabezpieczenia SSH,
    * dodać link do dokumentu w `README.md`.
 
-3. Użytkownik B otwiera publiczne repozytorium Użytkownika A.
-
-4. Użytkownik B wykonuje **Fork** repozytorium do swojego konta.
-
-5. Użytkownik B upewnia się, że jego fork zawiera branch `dev`.
-
-6. Przed rozpoczęciem pracy synchronizuje fork z repozytorium źródłowym:
+3. Issue otrzymuje label:
 
    ```text
-   Sync fork → Update branch
+   documentation
    ```
 
-7. W swoim forku Użytkownik B tworzy branch na podstawie `dev`:
+### Etap 2 – Fork i branch roboczy
+
+1. Użytkownik B wykonuje fork głównego repozytorium.
+
+2. W swoim forku synchronizuje branch `dev` z repozytorium źródłowym.
+
+3. Na podstawie `dev` tworzy branch:
 
    ```text
    feature/add-linux-security-guide
    ```
 
-8. Na branchu roboczym tworzy plik:
+4. Użytkownik B upewnia się, że edytuje branch w swoim forku, a nie główne repozytorium.
+
+### Etap 3 – Wprowadzenie zmian
+
+1. Użytkownik B tworzy plik:
 
    ```text
    LINUX_SECURITY.md
    ```
 
-9. Zapisuje zmianę jako commit:
+2. Zapisuje pierwszy commit:
 
    ```text
    Add Linux security recommendations
    ```
 
-10. Edytuje `README.md` i dodaje link:
+3. Edytuje `README.md` i dodaje link:
 
-```md
-## Documentation
+   ```md
+   ## Documentation
 
-- [Linux Security Recommendations](LINUX_SECURITY.md)
-```
+   - [Linux Security Recommendations](LINUX_SECURITY.md)
+   ```
 
-11. Tworzy drugi commit:
+4. Zapisuje drugi commit:
+
+   ```text
+   Link Linux security guide from README
+   ```
+
+### Etap 4 – Pull Request do `dev`
+
+Użytkownik B tworzy Pull Request:
 
 ```text
-Link Linux security guide from README
+USER_B/REPOSITORY:feature/add-linux-security-guide
+                         ↓
+USER_A/REPOSITORY:dev
 ```
 
-12. Użytkownik B tworzy Pull Request o kierunku:
-
-```text
-UŻYTKOWNIK-B/repo:feature/add-linux-security-guide
-                       ↓
-UŻYTKOWNIK-A/repo:dev
-```
-
-13. W opisie Pull Requesta wpisuje:
+Opis Pull Requesta:
 
 ```md
 ## Summary
@@ -137,139 +250,113 @@ Added Linux security recommendations covering:
 
 - system updates,
 - firewall configuration,
-- SSH security.
+- SSH hardening.
 
 The document was linked from README.md.
 
 Closes #1
 ```
 
-14. Użytkownik A wykonuje review w zakładce **Files changed**.
+### Etap 5 – Code review
 
-15. Użytkownik A dodaje komentarz do wybranej linii:
+1. Użytkownik A przechodzi do zakładki **Files changed**.
 
-```text
-Please add an example command for checking the SSH configuration.
-```
+2. Dodaje komentarz:
 
-16. Użytkownik A wybiera:
+   ```text
+   Please add a command for validating the SSH configuration.
+   ```
 
-```text SSH configuration.
-```
+3. Wybiera:
 
-16. Użytkownik A wybiera:
+   ```text
+   Request changes
+   ```
 
-```text
-Request changes
-```
+4. Użytkownik B poprawia plik na tym samym branchu i dodaje:
 
-17. Użytkownik B wraca do tego samego brancha w swoim forku i dodaje poprawkę:
+   ```bash
+   sudo sshd -t
+   ```
+
+5. Tworzy kolejny commit:
+
+   ```text
+   Add SSH configuration validation command
+   ```
+
+6. Istniejący Pull Request aktualizuje się automatycznie.
+
+7. Użytkownik B odpowiada na komentarz:
+
+   ```text
+   Added the requested SSH configuration validation command.
+   ```
+
+8. Dyskusja zostaje oznaczona jako rozwiązana.
+
+9. Użytkownik A wybiera:
+
+   ```text
+   Approve
+   ```
+
+10. Pull Request zostaje zmergowany do `dev`.
+
+### Etap 6 – Aktualizacja `latest-dev`
+
+Po merge Użytkownik A aktualizuje lokalne dane:
 
 ```bash
-sudo sshd -t
+git fetch origin --prune --tags
 ```
 
-18. Użytkownik B zapisuje kolejny commit:
+Następnie przesuwa tag `latest-dev`:
+
+```bash
+git tag -f latest-dev origin/dev
+git push origin refs/tags/latest-dev --force
+```
+
+Rezultat:
 
 ```text
-Add SSH configuration validation command
+latest-dev → najnowszy commit brancha dev
 ```
 
-19. Istniejący Pull Request aktualizuje się automatycznie.
+### Etap 7 – Promocja do UAT
 
-20. Użytkownik B odpowiada na komentarz:
-
-```text
-Added the requested SSH configuration validation command.
-```
-
-21. Dyskusja zostaje oznaczona jako:
-
-```text
-Resolved
-```
-
-22. Użytkownik A ponownie wykonuje review i wybiera:
-
-```text
-Approve
-```
-
-23. Użytkownik A wykonuje:
-
-```text
-Squash and merge
-```
-
-24. Po merge Użytkownik B usuwa branch:
-
-```text
-feature/add-linux-security-guide
-```
-
-### Oczekiwany rezultat
-
-* zmiany znajdują się na branchu `dev` głównego repozytorium,
-* Pull Request ma status `Merged`,
-* Issue zostało automatycznie zamknięte,
-* `main` oraz `uat` nie zawierają jeszcze nowych zmian,
-* branch roboczy w forku został usunięty.
-
----
-
-## Scenariusz 2 – Promowanie zmian z `dev` do `uat` i `main`
-
-### Cel ćwiczenia
-
-Przećwiczenie kontrolowanego przepływu zmian pomiędzy branchami odpowiadającymi różnym środowiskom.
-
-### Etap 1 – Pull Request z `dev` do `uat`
-
-1. Użytkownik A przechodzi do głównego repozytorium.
-
-2. Tworzy Pull Request:
+1. Użytkownik A tworzy Pull Request:
 
    ```text
    dev → uat
    ```
 
-3. Tytuł Pull Requesta:
+2. Tytuł:
 
    ```text
    Promote Linux security documentation to UAT
    ```
 
-4. Opis:
+3. Po review i testach Pull Request zostaje zmergowany.
 
-   ```md
-   ## Summary
+4. Użytkownik A aktualizuje tag:
 
-   This Pull Request promotes the Linux security documentation
-   from the development branch to the UAT branch.
-
-   ## Validation
-
-   - Markdown formatting verified
-   - README link verified
-   - SSH command reviewed
+   ```bash
+   git fetch origin --prune --tags
+   git tag -f latest-uat origin/uat
+   git push origin refs/tags/latest-uat --force
    ```
 
-5. Drugi użytkownik wykonuje review zmian.
+Rezultat:
 
-6. Reviewer może dodać komentarz lub zatwierdzić Pull Request.
+```text
+latest-uat → najnowszy commit brancha uat
+```
 
-7. Po zatwierdzeniu następuje merge do `uat`.
+### Etap 8 – Promocja do produkcji
 
-8. Na branchu `uat` wykonywane są testy akceptacyjne:
-
-   * sprawdzenie zawartości pliku,
-   * sprawdzenie formatowania Markdown,
-   * sprawdzenie działania linku w `README.md`,
-   * sprawdzenie poprawności przykładowych poleceń.
-
-### Etap 2 – Pull Request z `uat` do `main`
-
-1. Po zakończeniu testów UAT Użytkownik A tworzy kolejny Pull Request:
+1. Po pozytywnych testach UAT Użytkownik A tworzy Pull Request:
 
    ```text
    uat → main
@@ -281,245 +368,368 @@ Przećwiczenie kontrolowanego przepływu zmian pomiędzy branchami odpowiadając
    Release Linux security documentation to production
    ```
 
-3. Opis:
+3. Po zatwierdzeniu Pull Request zostaje zmergowany.
 
-   ```md
-   ## Summary
+4. Na tym etapie nie należy jeszcze przesuwać `latest-prod`.
 
-   Promotes the tested Linux security documentation
-   from UAT to the production branch.
-
-   ## UAT result
-
-   - Documentation reviewed
-   - Links verified
-   - Commands validated
-   - No blocking issues found
-   ```
-
-4. Reviewer zatwierdza Pull Request.
-
-5. Użytkownik A wykonuje merge do `main`.
+Tag `latest-prod` zostanie zaktualizowany po utworzeniu oficjalnego Release.
 
 ### Oczekiwany rezultat
 
-Po zakończeniu ćwiczenia wszystkie trzy branche powinny zawierać zaakceptowaną zmianę:
-
-```text
-dev
- ↓
-uat
- ↓
-main
-```
-
-Pull Requesty powinny mieć status:
-
-```text
-feature branch → dev     Merged
-dev → uat                Merged
-uat → main               Merged
-```
-
-Branch `main` reprezentuje teraz stabilną wersję gotową do wydania.
+| Element                   | Rezultat                                     |
+| ------------------------- | -------------------------------------------- |
+| Pull Request z forka      | `Merged` do `dev`                            |
+| Pull Request `dev → uat`  | `Merged`                                     |
+| Pull Request `uat → main` | `Merged`                                     |
+| `latest-dev`              | wskazuje aktualny `dev`                      |
+| `latest-uat`              | wskazuje aktualny `uat`                      |
+| `latest-prod`             | nadal wskazuje poprzednią wersję produkcyjną |
 
 ---
 
-## Scenariusz 3 – Utworzenie taga i GitHub Release
+## Scenariusz 2 – Pierwszy Release i aktualizacja `latest-prod`
 
 ### Cel ćwiczenia
 
-Przećwiczenie oznaczenia konkretnego commita jako wersji projektu i opublikowania oficjalnego wydania.
+Przećwiczenie utworzenia trwałego taga wersji i opublikowania GitHub Release.
 
-### Etap 1 – Utworzenie wersji testowej
+### Etap 1 – Utworzenie Release
 
-Po zmergowaniu zmian do `uat` można utworzyć wersję testową.
+Użytkownik A przechodzi do:
 
-1. Użytkownik A przechodzi do:
+```text
+Releases → Draft a new release
+```
 
-   ```text
-   Releases → Draft a new release
-   ```
+Ustawienia:
 
-2. Tworzy nowy tag:
+| Pole           | Wartość                               |
+| -------------- | ------------------------------------- |
+| Tag            | `v1.0.0`                              |
+| Target         | `main`                                |
+| Release title  | `Linux Security Documentation v1.0.0` |
+| Pre-release    | wyłączone                             |
+| Latest release | włączone                              |
 
-   ```text
-   v1.0.0-rc.1
-   ```
+Release notes:
 
-3. Jako target wybiera branch:
+```md
+## Version 1.0.0
 
-   ```text
-   uat
-   ```
+First stable release of the Linux security documentation.
 
-4. Tytuł wydania:
+### Added
 
-   ```text
-   Linux Security Documentation v1.0.0 RC1
-   ```
+- Linux system update recommendations
+- Firewall verification guidance
+- SSH hardening recommendations
+- SSH configuration validation command
+- Documentation link in README
+```
 
-5. Opis:
+Następnie Użytkownik A wybiera:
 
-   ```md
-   ## Release candidate
+```text
+Publish release
+```
 
-   This release candidate contains:
+Powstaje trwały tag:
 
-   - Linux security recommendations,
-   - SSH configuration validation,
-   - firewall recommendations,
-   - README documentation link.
+```text
+v1.0.0
+```
 
-   This version is intended for UAT testing.
-   ```
+### Etap 2 – Aktualizacja `latest-prod`
 
-6. Zaznacza opcję:
+Po opublikowaniu Release Użytkownik A pobiera nowy tag:
 
-   ```text
-   Set as a pre-release
-   ```
+```bash
+git fetch origin --prune --tags
+```
 
-7. Publikuje wersję testową.
+Tag `latest-prod` powinien wskazywać dokładnie ten sam commit co `v1.0.0`:
 
-### Etap 2 – Utworzenie stabilnego wydania
+```bash
+git tag -f latest-prod v1.0.0
+git push origin refs/tags/latest-prod --force
+```
 
-Po zatwierdzeniu testów i zmergowaniu `uat` do `main`:
+Rezultat:
 
-1. Użytkownik A ponownie przechodzi do sekcji **Releases**.
+```text
+v1.0.0     ─┐
+             ├── ten sam commit produkcyjny
+latest-prod ─┘
+```
 
-2. Wybiera:
+### Etap 3 – Weryfikacja
 
-   ```text
-   Draft a new release
-   ```
+W GitHub UI należy przejść do:
 
-3. Tworzy nowy tag:
+```text
+Releases → Tags
+```
 
-   ```text
-   v1.0.0
-   ```
+Następnie sprawdzić, czy:
 
-4. Jako target wybiera:
+* `v1.0.0` istnieje,
+* `latest-prod` istnieje,
+* oba tagi pokazują ten sam commit SHA,
+* `latest-dev` wskazuje aktualny commit `dev`,
+* `latest-uat` wskazuje aktualny commit `uat`.
 
-   ```text
-   main
-   ```
+Można również wykonać lokalną weryfikację:
 
-5. Tytuł wydania:
+```bash
+git rev-parse v1.0.0
+git rev-parse latest-prod
+```
 
-   ```text
-   Linux Security Documentation v1.0.0
-   ```
-
-6. Dodaje opis:
-
-   ```md
-   ## Version 1.0.0
-
-   First stable release of the Linux security documentation.
-
-   ### Added
-
-   - Linux system update recommendations
-   - Firewall verification guidance
-   - SSH hardening recommendations
-   - SSH configuration validation command
-   - Documentation link in README
-   ```
-
-7. Opcjonalnie używa:
-
-   ```text
-   Generate release notes
-   ```
-
-8. Upewnia się, że wydanie nie jest oznaczone jako pre-release.
-
-9. Publikuje Release.
-
-### Etap 3 – Wydanie poprawki
-
-1. Użytkownik B wykonuje kolejną niewielką poprawkę przez fork i Pull Request.
-
-2. Zmiana przechodzi ponownie przez:
-
-   ```text
-   feature branch → dev → uat → main
-   ```
-
-3. Ponieważ jest to poprawka błędu lub dokumentacji, Użytkownik A tworzy nową wersję:
-
-   ```text
-   v1.0.1
-   ```
-
-4. Poprzedni tag `v1.0.0` nie jest usuwany ani przesuwany.
+Oba polecenia powinny zwrócić ten sam pełny SHA.
 
 ### Oczekiwany rezultat
 
-W repozytorium powinny być dostępne:
+| Tag           | Wskazywany stan                 |
+| ------------- | ------------------------------- |
+| `v1.0.0`      | niezmienny commit wydania 1.0.0 |
+| `latest-prod` | ten sam commit co `v1.0.0`      |
+| `latest-uat`  | aktualny commit środowiska UAT  |
+| `latest-dev`  | aktualny commit środowiska DEV  |
 
-| Typ            | Nazwa         | Target                         |
-| -------------- | ------------- | ------------------------------ |
-| Pre-release    | `v1.0.0-rc.1` | commit testowany na `uat`      |
-| Stable release | `v1.0.0`      | zaakceptowany commit na `main` |
-| Patch release  | `v1.0.1`      | późniejsza poprawka na `main`  |
+---
 
-Schemat końcowy:
+## Scenariusz 3 – Nowa wersja i przesunięcie tagów `latest-*`
 
-```text
-dev
- ↓
-uat ── tag v1.0.0-rc.1 ── Pre-release
- ↓
-main ── tag v1.0.0 ────── Stable Release
- ↓
-main ── tag v1.0.1 ────── Patch Release
+### Cel ćwiczenia
+
+Przećwiczenie wydania poprawki `v1.0.1` oraz przesunięcia tagów środowiskowych na nowsze commity.
+
+### Etap 1 – Nowa poprawka
+
+1. Użytkownik A tworzy Issue:
+
+   ```text
+   Fix SSH service restart instructions
+   ```
+
+2. Użytkownik B synchronizuje fork.
+
+3. Na podstawie aktualnego `dev` tworzy branch:
+
+   ```text
+   fix/ssh-restart-instructions
+   ```
+
+4. Wprowadza poprawkę.
+
+5. Tworzy commit:
+
+   ```text
+   Fix SSH restart instructions
+   ```
+
+6. Otwiera Pull Request:
+
+   ```text
+   USER_B:fix/ssh-restart-instructions → USER_A:dev
+   ```
+
+7. Pull Request przechodzi review i zostaje zmergowany.
+
+### Etap 2 – Przesunięcie `latest-dev`
+
+Po merge do `dev`:
+
+```bash
+git fetch origin --prune --tags
+git tag -f latest-dev origin/dev
+git push origin refs/tags/latest-dev --force
 ```
 
-## Podsumowanie
-
-Najważniejszy przepływ pracy:
+Nowy stan:
 
 ```text
-Issue
-  ↓
-Fork
-  ↓
-Feature branch
-  ↓
-Edycja i commity
-  ↓
+latest-dev → commit zawierający poprawkę
+```
+
+Pozostałe tagi jeszcze się nie zmieniają:
+
+```text
+latest-uat  → poprzednia wersja na UAT
+latest-prod → v1.0.0
+```
+
+### Etap 3 – Promocja poprawki do UAT
+
+1. Użytkownik A tworzy Pull Request:
+
+   ```text
+   dev → uat
+   ```
+
+2. Po review, merge i testach aktualizuje tag:
+
+   ```bash
+   git fetch origin --prune --tags
+   git tag -f latest-uat origin/uat
+   git push origin refs/tags/latest-uat --force
+   ```
+
+Nowy stan:
+
+```text
+latest-dev → nowa poprawka
+latest-uat → nowa poprawka po testach
+latest-prod → nadal v1.0.0
+```
+
+### Etap 4 – Promocja poprawki do produkcji
+
+1. Użytkownik A tworzy Pull Request:
+
+   ```text
+   uat → main
+   ```
+
+2. Po zatwierdzeniu wykonuje merge do `main`.
+
+3. Tworzy nowy Release:
+
+   ```text
+   Tag: v1.0.1
+   Target: main
+   ```
+
+4. Release title:
+
+   ```text
+   Linux Security Documentation v1.0.1
+   ```
+
+5. Release notes:
+
+   ```md
+   ## Version 1.0.1
+
+   ### Fixed
+
+   - Corrected SSH service validation and restart instructions.
+   ```
+
+6. Publikuje Release.
+
+### Etap 5 – Przesunięcie `latest-prod`
+
+Po opublikowaniu wersji:
+
+```bash
+git fetch origin --prune --tags
+git tag -f latest-prod v1.0.1
+git push origin refs/tags/latest-prod --force
+```
+
+Nowy stan:
+
+```text
+v1.0.0 → stary commit wydania 1.0.0
+v1.0.1 → nowy commit wydania 1.0.1
+
+latest-prod → ten sam commit co v1.0.1
+```
+
+Tag `v1.0.0` pozostaje bez zmian.
+
+### Etap 6 – Weryfikacja końcowa
+
+Należy potwierdzić:
+
+| Tag           | Oczekiwany rezultat                       |
+| ------------- | ----------------------------------------- |
+| `v1.0.0`      | nadal wskazuje pierwsze wydanie           |
+| `v1.0.1`      | wskazuje nowe wydanie                     |
+| `latest-prod` | wskazuje ten sam commit co `v1.0.1`       |
+| `latest-uat`  | wskazuje najnowszy commit wdrożony na UAT |
+| `latest-dev`  | wskazuje najnowszy commit wdrożony na DEV |
+
+Lokalna weryfikacja:
+
+```bash
+git fetch origin --prune --tags
+
+git rev-parse v1.0.0
+git rev-parse v1.0.1
+git rev-parse latest-prod
+git rev-parse latest-uat
+git rev-parse latest-dev
+```
+
+Wartości:
+
+```text
+git rev-parse v1.0.1
+git rev-parse latest-prod
+```
+
+powinny być identyczne.
+
+## Ważna zasada dotycząca środowisk
+
+Nie należy automatycznie przestawiać wszystkich tagów `latest-*` na commit produkcyjny.
+
+Każdy tag opisuje własne środowisko:
+
+```text
+latest-dev  → to, co aktualnie znajduje się na DEV
+latest-uat  → to, co aktualnie znajduje się na UAT
+latest-prod → to, co aktualnie znajduje się na produkcji
+```
+
+Jeżeli po wydaniu `v1.0.1` na `dev` rozpoczęto już prace nad wersją `v1.1.0`, wtedy:
+
+```text
+latest-dev  → może wskazywać nowszy commit niż v1.0.1
+latest-uat  → może nadal wskazywać v1.0.1 albo nowszego kandydata
+latest-prod → powinien wskazywać v1.0.1
+```
+
+## Podsumowanie przepływu
+
+```text
+zmiana w forku
+      ↓
 Pull Request do dev
-  ↓
-Review i poprawki
-  ↓
-Merge do dev
-  ↓
+      ↓
+merge
+      ↓
+przesunięcie latest-dev
+      ↓
 Pull Request dev → uat
-  ↓
-Testy UAT
-  ↓
+      ↓
+testy i merge
+      ↓
+przesunięcie latest-uat
+      ↓
 Pull Request uat → main
-  ↓
-Tag
-  ↓
-GitHub Release
+      ↓
+merge
+      ↓
+tag wersji v1.0.1
+      ↓
+GitHub Release v1.0.1
+      ↓
+przesunięcie latest-prod na v1.0.1
 ```
 
-Najważniejsze pojęcia:
+## Najważniejsze zasady
 
-| Element      | Znaczenie                                   |
-| ------------ | ------------------------------------------- |
-| Fork         | własna kopia repozytorium na GitHub         |
-| Branch       | oddzielna linia pracy nad zmianą            |
-| Commit       | zapis konkretnego zestawu zmian             |
-| Pull Request | propozycja połączenia zmian                 |
-| Review       | sprawdzenie, dyskusja i zatwierdzenie zmian |
-| Merge        | dołączenie zmian do brancha docelowego      |
-| Tag          | stała etykieta wskazująca konkretny commit  |
-| Release      | opublikowana wersja projektu oparta na tagu |
+| Zasada                                    | Wyjaśnienie                                            |
+| ----------------------------------------- | ------------------------------------------------------ |
+| Nie przesuwaj `v1.0.0`                    | Tag wersji musi stale wskazywać oryginalne wydanie     |
+| Twórz nowy tag dla nowej wersji           | Poprawka otrzymuje np. `v1.0.1`                        |
+| Przesuwaj `latest-dev` po zmianie DEV     | Tag wskazuje aktualny stan DEV                         |
+| Przesuwaj `latest-uat` po zmianie UAT     | Tag wskazuje aktualny stan UAT                         |
+| Przesuwaj `latest-prod` po Release        | Tag wskazuje aktualną wersję produkcyjną               |
+| Nie twórz Release z `latest-*`            | Release powinien opierać się na trwałym tagu wersji    |
+| Aktualizacja `latest-*` wymaga force push | Istniejący tag musi zostać przestawiony na nowy commit |
 
 ```
-
